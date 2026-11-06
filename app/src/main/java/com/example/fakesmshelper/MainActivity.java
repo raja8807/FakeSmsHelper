@@ -4,137 +4,112 @@ import android.app.Activity;
 import android.app.role.RoleManager;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.provider.Telephony;
+import android.provider.CallLog;
+import android.Manifest;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
-    private static final int REQUEST_SMS_ROLE = 401;
+    private static final int ROLE_REQUEST = 700;
+    private static final int PERMISSION_REQUEST = 701;
     private TextView status;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        showUi();
-        handleIntent(getIntent());
-    }
-
-    private void showUi() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(36, 36, 36, 36);
 
         status = new TextView(this);
-        status.setText("Fake SMS Helper\n\nSet this app as the default SMS app to insert test messages.");
-        status.setTextSize(18);
+        status.setText("FakeSmsHelper CallLog\n\nGrant default Dialer role, then add a local test call entry.");
         layout.addView(status);
 
         Button roleButton = new Button(this);
-        roleButton.setText("Set as default SMS app");
-        roleButton.setOnClickListener(v -> requestSmsRole());
+        roleButton.setText("Set as default dialer");
+        roleButton.setOnClickListener(v -> requestDialerRole());
         layout.addView(roleButton);
 
-        Button insertButton = new Button(this);
-        insertButton.setText("Insert sample test SMS");
-        insertButton.setOnClickListener(v -> insertSms(
-                "5550101234", "TEST ONLY: Sample SMS inserted by Fake SMS Helper",
-                System.currentTimeMillis(), false));
-        layout.addView(insertButton);
+        Button missedButton = new Button(this);
+        missedButton.setText("Insert test missed call");
+        missedButton.setOnClickListener(v -> insertCall("9876543210", CallLog.Calls.MISSED_TYPE, 0));
+        layout.addView(missedButton);
+
+        Button incomingButton = new Button(this);
+        incomingButton.setText("Insert test incoming call");
+        incomingButton.setOnClickListener(v -> insertCall("9876543210", CallLog.Calls.INCOMING_TYPE, 42));
+        layout.addView(incomingButton);
+
+        Button outgoingButton = new Button(this);
+        outgoingButton.setText("Insert test outgoing call");
+        outgoingButton.setOnClickListener(v -> insertCall("9876543210", CallLog.Calls.OUTGOING_TYPE, 35));
+        layout.addView(outgoingButton);
 
         setContentView(layout);
     }
 
-    private void requestSmsRole() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            RoleManager roleManager = getSystemService(RoleManager.class);
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
-                if (roleManager.isRoleHeld(RoleManager.ROLE_SMS)) {
-                    status.setText("This app already holds the default SMS role.");
-                } else {
-                    startActivityForResult(
-                            roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS),
-                            REQUEST_SMS_ROLE);
-                }
+    private void requestDialerRole() {
+        RoleManager rm = (RoleManager) getSystemService(ROLE_SERVICE);
+        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+            if (rm.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                status.setText("Default Dialer role is already granted.");
+                requestCallLogPermissions();
             } else {
-                status.setText("SMS role is not available on this device.");
+                startActivityForResult(rm.createRequestRoleIntent(RoleManager.ROLE_DIALER), ROLE_REQUEST);
             }
         } else {
-            status.setText("This sample targets Android 10+ role management.");
+            status.setText("Default Dialer role is unavailable on this device.");
         }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_SMS_ROLE) {
-            RoleManager roleManager = getSystemService(RoleManager.class);
-            boolean held = roleManager != null && roleManager.isRoleHeld(RoleManager.ROLE_SMS);
-            status.setText(held ? "Default SMS role granted." : "Default SMS role not granted.");
-            Toast.makeText(this, status.getText(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        handleIntent(intent);
-    }
-
-    private void handleIntent(Intent intent) {
-        if (intent == null || !"com.example.fakesmshelper.INSERT_TEST_SMS".equals(intent.getAction())) {
-            return;
-        }
-        String address = intent.getStringExtra("address");
-        String body = intent.getStringExtra("body");
-        long date = intent.getLongExtra("date", System.currentTimeMillis());
-        boolean read = intent.getBooleanExtra("read", false);
-
-        if (address == null || address.trim().isEmpty() || body == null) {
-            Toast.makeText(this, "Provide address and body extras.", Toast.LENGTH_LONG).show();
-            return;
-        }
-        insertSms(address, body, date, read);
-    }
-
-    private void insertSms(String address, String body, long date, boolean read) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            RoleManager roleManager = getSystemService(RoleManager.class);
-            if (roleManager == null || !roleManager.isRoleHeld(RoleManager.ROLE_SMS)) {
-                Toast.makeText(this, "Grant default SMS role first.", Toast.LENGTH_LONG).show();
-                status.setText("Default SMS role required before inserting.");
-                return;
-            }
-        }
-
-        ContentValues values = new ContentValues();
-        values.put(Telephony.Sms.ADDRESS, address);
-        values.put(Telephony.Sms.BODY, body);
-        values.put(Telephony.Sms.DATE, date);
-        values.put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX);
-        values.put(Telephony.Sms.READ, read ? 1 : 0);
-        values.put(Telephony.Sms.SEEN, read ? 1 : 0);
-
-        try {
-            Uri result = getContentResolver().insert(Telephony.Sms.CONTENT_URI, values);
-            if (result != null) {
-                status.setText("Inserted test SMS. URI: " + result);
-                Toast.makeText(this, "Test SMS inserted.", Toast.LENGTH_LONG).show();
+        if (requestCode == ROLE_REQUEST) {
+            RoleManager rm = (RoleManager) getSystemService(ROLE_SERVICE);
+            if (rm != null && rm.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                status.setText("Default Dialer role granted.");
+                requestCallLogPermissions();
             } else {
-                status.setText("Provider returned no URI; insertion may have failed.");
-                Toast.makeText(this, "Insert failed: no result URI.", Toast.LENGTH_LONG).show();
+                status.setText("Default Dialer role not granted.");
             }
-        } catch (SecurityException e) {
-            status.setText("Permission denied: " + e.getMessage());
-            Toast.makeText(this, "Permission denied by SMS provider.", Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            status.setText("Insert error: " + e.getClass().getSimpleName() + ": " + e.getMessage());
-            Toast.makeText(this, status.getText(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void requestCallLogPermissions() {
+        if (checkSelfPermission(Manifest.permission.WRITE_CALL_LOG) != PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.READ_CALL_LOG, Manifest.permission.WRITE_CALL_LOG}, PERMISSION_REQUEST);
+        } else {
+            status.setText("Call log permissions granted. Ready for local test entries.");
+        }
+    }
+
+    private void insertCall(String number, int type, int duration) {
+        if (checkSelfPermission(Manifest.permission.WRITE_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Grant Dialer role and call-log permission first.", Toast.LENGTH_LONG).show();
+            requestCallLogPermissions();
+            return;
+        }
+        ContentValues values = new ContentValues();
+        values.put(CallLog.Calls.NUMBER, number);
+        values.put(CallLog.Calls.DATE, System.currentTimeMillis());
+        values.put(CallLog.Calls.DURATION, duration);
+        values.put(CallLog.Calls.TYPE, type);
+        values.put(CallLog.Calls.NEW, 1);
+        values.put(CallLog.Calls.IS_READ, 0);
+        values.put(CallLog.Calls.PHONE_ACCOUNT_ID, (String) null);
+        Uri result = getContentResolver().insert(CallLog.Calls.CONTENT_URI, values);
+        if (result != null) {
+            status.setText("Inserted local test call: " + number + " (type " + type + ")");
+            Toast.makeText(this, "Test call log inserted", Toast.LENGTH_SHORT).show();
+        } else {
+            status.setText("Call log insert returned no record. MIUI may restrict writes.");
         }
     }
 }

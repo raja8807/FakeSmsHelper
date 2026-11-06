@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
 }
+
 android {
     namespace 'com.example.fakesmshelper'
     compileSdk 35
@@ -9,7 +10,7 @@ android {
         applicationId 'com.example.fakesmshelper'
         minSdk 23
         targetSdk 29
-        versionCode 1
-        versionName '1.0'
+        versionCode 2
+        versionName '1.1'
     }
 }
