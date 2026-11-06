@@ -1,1 +1,3 @@
-package com.example.fakesmshelper;\nimport android.telecom.InCallService;\npublic class FakeInCallService extends InCallService {}\n
+package com.example.fakesmshelper;
+import android.telecom.InCallService;
+public class FakeInCallService extends InCallService {}
