@@ -1,9 +1,4 @@
-<<<<<<< .merge_file_zQdgR4
 name: Build FakeSmsHelper CallLog APK
-=======
-
-name: Build FakeSmsHelper APK
->>>>>>> .merge_file_aNrpEO
 
 on:
   workflow_dispatch:
@@ -14,7 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
