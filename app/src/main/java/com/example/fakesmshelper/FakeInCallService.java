@@ -1,7 +1,1 @@
-package com.example.fakesmshelper;
-
-import android.telecom.InCallService;
-
-/** Minimal service declaration used to qualify as a default dialer candidate. */
-public class FakeInCallService extends InCallService {
-}
+package com.example.fakesmshelper;\nimport android.telecom.InCallService;\npublic class FakeInCallService extends InCallService {}\n

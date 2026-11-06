@@ -1,115 +1,25 @@
 package com.example.fakesmshelper;
-
-import android.app.Activity;
-import android.app.role.RoleManager;
-import android.content.ContentValues;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.net.Uri;
-import android.os.Bundle;
-import android.provider.CallLog;
-import android.Manifest;
-import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
-
+import android.app.Activity; import android.app.role.RoleManager; import android.content.*; import android.net.Uri; import android.os.Bundle; import android.provider.CallLog; import android.provider.Telephony; import android.content.ContentValues; import android.widget.*;
 public class MainActivity extends Activity {
-    private static final int ROLE_REQUEST = 700;
-    private static final int PERMISSION_REQUEST = 701;
-    private TextView status;
-
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(36, 36, 36, 36);
-
-        status = new TextView(this);
-        status.setText("FakeSmsHelper CallLog\n\nGrant default Dialer role, then add a local test call entry.");
-        layout.addView(status);
-
-        Button roleButton = new Button(this);
-        roleButton.setText("Set as default dialer");
-        roleButton.setOnClickListener(v -> requestDialerRole());
-        layout.addView(roleButton);
-
-        Button missedButton = new Button(this);
-        missedButton.setText("Insert test missed call");
-        missedButton.setOnClickListener(v -> insertCall("9876543210", CallLog.Calls.MISSED_TYPE, 0));
-        layout.addView(missedButton);
-
-        Button incomingButton = new Button(this);
-        incomingButton.setText("Insert test incoming call");
-        incomingButton.setOnClickListener(v -> insertCall("9876543210", CallLog.Calls.INCOMING_TYPE, 42));
-        layout.addView(incomingButton);
-
-        Button outgoingButton = new Button(this);
-        outgoingButton.setText("Insert test outgoing call");
-        outgoingButton.setOnClickListener(v -> insertCall("9876543210", CallLog.Calls.OUTGOING_TYPE, 35));
-        layout.addView(outgoingButton);
-
-        setContentView(layout);
-    }
-
-    private void requestDialerRole() {
-        RoleManager rm = (RoleManager) getSystemService(ROLE_SERVICE);
-        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_DIALER)) {
-            if (rm.isRoleHeld(RoleManager.ROLE_DIALER)) {
-                status.setText("Default Dialer role is already granted.");
-                requestCallLogPermissions();
-            } else {
-                startActivityForResult(rm.createRequestRoleIntent(RoleManager.ROLE_DIALER), ROLE_REQUEST);
-            }
-        } else {
-            status.setText("Default Dialer role is unavailable on this device.");
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == ROLE_REQUEST) {
-            RoleManager rm = (RoleManager) getSystemService(ROLE_SERVICE);
-            if (rm != null && rm.isRoleHeld(RoleManager.ROLE_DIALER)) {
-                status.setText("Default Dialer role granted.");
-                requestCallLogPermissions();
-            } else {
-                status.setText("Default Dialer role not granted.");
-            }
-        }
-    }
-
-    private void requestCallLogPermissions() {
-        if (checkSelfPermission(Manifest.permission.WRITE_CALL_LOG) != PackageManager.PERMISSION_GRANTED ||
-            checkSelfPermission(Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.READ_CALL_LOG, Manifest.permission.WRITE_CALL_LOG}, PERMISSION_REQUEST);
-        } else {
-            status.setText("Call log permissions granted. Ready for local test entries.");
-        }
-    }
-
-    private void insertCall(String number, int type, int duration) {
-        if (checkSelfPermission(Manifest.permission.WRITE_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Grant Dialer role and call-log permission first.", Toast.LENGTH_LONG).show();
-            requestCallLogPermissions();
-            return;
-        }
-        ContentValues values = new ContentValues();
-        values.put(CallLog.Calls.NUMBER, number);
-        values.put(CallLog.Calls.DATE, System.currentTimeMillis());
-        values.put(CallLog.Calls.DURATION, duration);
-        values.put(CallLog.Calls.TYPE, type);
-        values.put(CallLog.Calls.NEW, 1);
-        values.put(CallLog.Calls.IS_READ, 0);
-        values.put(CallLog.Calls.PHONE_ACCOUNT_ID, (String) null);
-        Uri result = getContentResolver().insert(CallLog.Calls.CONTENT_URI, values);
-        if (result != null) {
-            status.setText("Inserted local test call: " + number + " (type " + type + ")");
-            Toast.makeText(this, "Test call log inserted", Toast.LENGTH_SHORT).show();
-        } else {
-            status.setText("Call log insert returned no record. MIUI may restrict writes.");
-        }
-    }
+static final String SMS="com.example.fakesmshelper.INSERT_TEST_SMS", CALL="com.example.fakesmshelper.INSERT_TEST_CALL", BOTH="com.example.fakesmshelper.INSERT_TEST_BOTH";
+EditText smsNum,smsBody,smsDate,callNum,callName,callDate,duration; Spinner type; TextView status;
+String now(){return ""+System.currentTimeMillis();} long val(EditText e,long d){try{return Long.parseLong(e.getText().toString().trim());}catch(Exception x){return d;}}
+public void onCreate(Bundle b){super.onCreate(b);ui();command(getIntent());} protected void onNewIntent(Intent i){super.onNewIntent(i);setIntent(i);command(i);}
+void ui(){ScrollView sc=new ScrollView(this); LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(24,20,24,20);sc.addView(l);setContentView(sc);
+label(l,"SMS + Call Log Helper",24); button(l,"Set default SMS app",()->role(RoleManager.ROLE_SMS));button(l,"Set default dialer",()->role(RoleManager.ROLE_DIALER));
+label(l,"SMS",20);smsNum=field(l,"Sender number","9876543210");smsBody=field(l,"Message","TEST ONLY: SMS from helper");smsDate=field(l,"Timestamp ms",now());button(l,"Insert SMS",()->sms(smsNum.getText().toString(),smsBody.getText().toString(),val(smsDate,System.currentTimeMillis()),false));
+label(l,"Call log",20);callNum=field(l,"Phone number","9876543210");callName=field(l,"Caller name","Test Caller");callDate=field(l,"Timestamp ms",now());duration=field(l,"Duration seconds","0");type=new Spinner(this);type.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Missed","Incoming","Outgoing"}));l.addView(type);
+button(l,"Insert call log",()->call(callNum.getText().toString(),callName.getText().toString(),val(callDate,System.currentTimeMillis()),val(duration,0),type.getSelectedItemPosition()+1));
+button(l,"Insert SMS + Call log",()->{sms(smsNum.getText().toString(),smsBody.getText().toString(),val(smsDate,System.currentTimeMillis()),false);call(callNum.getText().toString(),callName.getText().toString(),val(callDate,System.currentTimeMillis()),val(duration,0),type.getSelectedItemPosition()+1);});
+status=new TextView(this);status.setText("Ready. Assign roles before inserting.");l.addView(status);}
+void label(LinearLayout l,String s,int n){TextView t=new TextView(this);t.setText(s);t.setTextSize(n);t.setPadding(0,12,0,6);l.addView(t);}
+EditText field(LinearLayout l,String h,String v){EditText e=new EditText(this);e.setHint(h);e.setText(v);l.addView(e);return e;}
+void button(LinearLayout l,String s,Runnable r){Button b=new Button(this);b.setText(s);b.setOnClickListener(v->r.run());l.addView(b);}
+void role(String r){RoleManager rm=getSystemService(RoleManager.class);if(rm!=null&&rm.isRoleAvailable(r)&&!rm.isRoleHeld(r))startActivityForResult(rm.createRequestRoleIntent(r),r.equals(RoleManager.ROLE_SMS)?101:102);else status.setText("Role held/unavailable: "+r);}
+void sms(String a,String b,long d,boolean read){try{ContentValues c=new ContentValues();c.put("address",a);c.put("body",b);c.put("date",d);c.put("date_sent",d);c.put("read",read?1:0);c.put("seen",read?1:0);c.put("type",Telephony.Sms.MESSAGE_TYPE_INBOX);Uri u=getContentResolver().insert(Uri.parse("content://sms/inbox"),c);status.setText("SMS inserted: "+u);}catch(Exception e){status.setText("SMS error: "+e);}}
+void call(String n,String name,long d,long dur,int t){try{ContentValues c=new ContentValues();c.put(CallLog.Calls.NUMBER,n);c.put(CallLog.Calls.CACHED_NAME,name);c.put(CallLog.Calls.DATE,d);c.put(CallLog.Calls.DURATION,dur);c.put(CallLog.Calls.TYPE,t);c.put(CallLog.Calls.NEW,1);c.put(CallLog.Calls.IS_READ,0);Uri u=getContentResolver().insert(CallLog.Calls.CONTENT_URI,c);status.setText("Call log inserted: "+u);}catch(Exception e){status.setText("Call log error: "+e);}}
+void command(Intent i){if(i==null||i.getAction()==null||status==null)return;String a=i.getAction();
+if(a.equals(SMS))sms(i.getStringExtra("address")==null?"9876543210":i.getStringExtra("address"),i.getStringExtra("body")==null?"TEST ONLY: SMS from CLI":i.getStringExtra("body"),i.getLongExtra("date",System.currentTimeMillis()),i.getBooleanExtra("read",false));
+else if(a.equals(CALL))call(i.getStringExtra("number")==null?"9876543210":i.getStringExtra("number"),i.getStringExtra("name")==null?"CLI Test Caller":i.getStringExtra("name"),i.getLongExtra("date",System.currentTimeMillis()),i.getLongExtra("duration",0),i.getIntExtra("type",CallLog.Calls.MISSED_TYPE));
+else if(a.equals(BOTH)){sms(i.getStringExtra("address")==null?"9876543210":i.getStringExtra("address"),i.getStringExtra("body")==null?"TEST ONLY: SMS from CLI":i.getStringExtra("body"),i.getLongExtra("sms_date",System.currentTimeMillis()),i.getBooleanExtra("read",false));call(i.getStringExtra("number")==null?"9876543210":i.getStringExtra("number"),i.getStringExtra("name")==null?"CLI Test Caller":i.getStringExtra("name"),i.getLongExtra("call_date",System.currentTimeMillis()),i.getLongExtra("duration",0),i.getIntExtra("type",CallLog.Calls.MISSED_TYPE));}}
 }
